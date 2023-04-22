@@ -4,7 +4,8 @@ const express = require("express");
 const ejs = require("ejs");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
-const md5 = require("md5");
+const bcrypt = require("bcrypt");
+const saltRounds = 11;
 
 const app = express();
 
@@ -22,9 +23,6 @@ const userSchema = new mongoose.Schema({
 
 const User = new mongoose.model("User", userSchema);
 
-console.log(md5("123$"));
-console.log(md5("123"));
-console.log(md5("1234"));
 
 
 app.get("/", (req, res) => {
@@ -47,20 +45,24 @@ app.route("/login")
 
 .post((req, res) =>{
     const username = req.body.username;
-    const password = md5(req.body.password);
+    const password = (req.body.password);
     User.findOne({email : username})
     .then(user => {
         if (!user){
             console.log("No User Found!!!");
             res.redirect("/login");
         }
-        else if (user.password === password){
-            console.log(user);            res.render("secrets");
-        }else {
-            console.log("Invalid Password!!!");
-            res.redirect("/login");
-        }
-    });
+        else if (user){
+            bcrypt.compare(password, user.password, function(err, result) {
+                if (result == true) {
+                    res.render("secrets");
+                }else{
+                    res.redirect("/login");
+                }
+          });
+
+        }      
+})
 });
 
 
@@ -73,19 +75,26 @@ app.route("/register")
 })
 
 .post((req, res) =>{
-    const newUser = new User({
-        email : req.body.username,
-        password: md5(req.body.password)
+
+    bcrypt.hash(req.body.password, saltRounds, function(err, hash) {
+        // Store hash in your password DB.
+        const newUser = new User({
+            email : req.body.username,
+            password: hash
+        })
+        newUser.save()
+        .then(result => {
+            console.log(result);
+            res.render("secrets");
+        })
+        .catch(err => {
+            console.log("Error: "+ err)
+        });
+        
+
     });
 
-    newUser.save()
-    .then(result => {
-        console.log(result);
-        res.render("secrets");
-    })
-    .catch(err => {
-        console.log("Error: "+ err)
-    });
+
 });
 
 
